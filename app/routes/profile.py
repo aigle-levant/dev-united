@@ -8,7 +8,7 @@ route features:
 
 # imports
 from fastapi import APIRouter
-from schemas.schema import ResolveRequest
+from app.schemas.routes import ResolveRequest
 from services.resolve_profile_service import resolve_profile_service as resolve_profile
 
 profile_router = APIRouter(prefix="/profiles", tags=["Profiles"])
