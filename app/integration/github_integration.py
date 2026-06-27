@@ -1,65 +1,109 @@
 from collections import Counter
-from base import GH_HEADERS, GH
+from integration.base import GH_HEADERS, GH
 from utils.http import get_json
+from schemas.profiles import GitHubAccount, GitHubProfile, Repository, GitHubEvent
 
-def fetch_profile(username: str):
-    return get_json(
-        f"{GH}/user/{username}",
+def fetch_profile(username: str) -> GitHubProfile:
+    data = get_json(
+        f"{GH}/users/{username}",
         headers=GH_HEADERS,
     )
 
-def fetch_repositories(username: str):
-    return get_json(
+    return GitHubProfile(
+        id=data["id"],
+        username=data["login"],
+        name=data.get("name"),
+        bio=data.get("bio"),
+        location=data.get("location"),
+        company=data.get("company"),
+        blog=data.get("blog"),
+        email=data.get("email"),
+        twitter_username=data.get("twitter_username"),
+        public_repos=data["public_repos"],
+        followers=data["followers"],
+        following=data["following"],
+        profile_url=data["html_url"],
+        avatar_url=data["avatar_url"],
+        created_at=data.get("created_at"),
+        updated_at=data.get("updated_at"),
+    )
+
+
+def fetch_repositories(username: str) -> list[Repository]:
+    repos = get_json(
         f"{GH}/users/{username}/repos",
         headers=GH_HEADERS,
     )
 
-def fetch_events(username: str):
-    return get_json(
+    return [
+        Repository(
+            id=repo["id"],
+            name=repo["name"],
+            description=repo.get("description"),
+            language=repo.get("language"),
+            stargazers_count=repo["stargazers_count"],
+            forks_count=repo["forks_count"],
+            html_url=repo["html_url"],
+            updated_at=repo.get("updated_at"),
+        )
+        for repo in repos
+    ]
+
+
+def fetch_events(
+    username: str,
+    limit: int = 10,
+) -> list[GitHubEvent]:
+    events = get_json(
         f"{GH}/users/{username}/events/public",
         headers=GH_HEADERS,
     )
 
-def extract_langs(repositories: list[dict]) -> list[str]:
-    return sorted(
-        repo["language"]
-        for repo in repositories
-        if repo.get("language")
-    )
-
-def recent_activity(events: list[dict], limit: int=10) -> list[dict]:
     activity = []
-    
+
     for event in events:
-        if event["type"] not in {"PushEvent",
-            "PullRequestEvent",}:
+        if event["type"] not in {
+            "PushEvent",
+            "PullRequestEvent",
+        }:
             continue
-        activity.append({
-            "type": event["type"],
-            "repo": event["repo"]["name"],
-            "created_at": event["created_at"],
-        })
-        if len(activity)==limit:
+
+        activity.append(
+            GitHubEvent(
+                type=event["type"],
+                repo=event["repo"]["name"],
+                created_at=event["created_at"],
+            )
+        )
+
+        if len(activity) >= limit:
             break
+
     return activity
 
-def lang_stats(repositories: list[dict]) -> dict[str, int]:
-    count = Counter()
-    for repo in repositories:
-        lang = repo.get("language")
-        if lang:
-            count[lang]+=1
-    return dict(count)
 
-def fetch_github(username: str):
+def extract_languages(
+    repositories: list[Repository],
+) -> list[str]:
+    return sorted(
+        {
+            repo.language
+            for repo in repositories
+            if repo.language
+        }
+    )
+
+
+def fetch_github(username: str) -> GitHubAccount:
     profile = fetch_profile(username)
-    repo = fetch_repositories(username)
+
+    repositories = fetch_repositories(username)
+
     events = fetch_events(username)
 
-    return {
-        "profile": profile,
-        "repositories": repo,
-        "languages": extract_langs(repo),
-        "language_stats": lang_stats(repo),
-        "recent_activity": recent_activity(events),
-    }
+    return GitHubAccount(
+        profile=profile,
+        repositories=repositories,
+        events=events,
+        languages=extract_languages(repositories),
+    )
