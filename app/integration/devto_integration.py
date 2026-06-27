@@ -5,24 +5,29 @@ output: fetched data in form of JSON
 """
 
 # imports
-from base import HN
+from base import DEVTO
 from utils.http import get_json
 
 def fetch_profile(username: str):
     return get_json(
-        f"{HN}/users/{username}"
+        f"{DEVTO}/users/by_username",
+        params={
+            "url": username
+        }
     )
 
-def fetch_activity(username: str):
-    return get_json(
-        f"{HN}/search",
-        params={
-            "tags": f"author_{username}"
-        }
-    )["hits"]
 
-def fetch_hn(username: str):
+def fetch_articles(username: str):
+    return get_json(
+        f"{DEVTO}/articles",
+        params={
+            "username": username
+        }
+    )
+
+
+def fetch_devto(username: str):
     return {
         "profile": fetch_profile(username),
-        "activity": fetch_activity(username),
+        "articles": fetch_articles(username)
     }

@@ -1,6 +1,55 @@
 # dev-united
 An unified portfolio for developers
 
+## Avoiding re-writing
+
+In programming, we have a principle:
+
+``DRY: DON'T REPEAT YOURSELF``
+
+Which means, modules are the way to go. And python is the best way for this.
+
+Example, instead of duplicating the same HTTP request logic in every API integration, I extracted the common functionality into a shared helper.
+
+Previously, each integration contained repetitive code like:
+
+```py
+response = httpx.get(...)
+response.raise_for_status()
+return response.json()
+```
+
+To eliminate this duplication, I created a reusable helper:
+
+```py
+def get_json(
+    url: str,
+    *,
+    params: dict | None = None,
+    headers: dict | None = None,
+    timeout: int = 10,
+):
+    response = httpx.get(
+        url,
+        params=params,
+        headers=headers,
+        timeout=timeout,
+    )
+
+    response.raise_for_status()
+
+    return response.json()
+```
+
+```PY
+def fetch_profile(username: str):
+    return get_json(
+        f"{HN}/users/{username}"
+    )
+```
+
+Now all I need to do is to simply call `get_json()` and pass arguments.
+
 ## Example of responses from various platforms
 
 Given that all the 4 platforms have completely different responses, the challenge is **normalization** without losing data.
