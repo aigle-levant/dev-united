@@ -11,10 +11,13 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 PORT = os.getenv("PORT")
 STACKEXCHANGE_KEY = os.getenv("SOF_API_KEY")
 WEIGHTS = {
+    "github": 60,
+    "twitter": 30,
+    "website": 20,
+    "github_link": 40,
     "email": 50,
-    "github": 40,
-    "website": 30,
-    "twitter": 20,
-    "name": 15,
+    "name": 20,
     "location": 10,
 }
+
+MATCH_THRESHOLD = 70

@@ -13,5 +13,5 @@ health_router = APIRouter(prefix="/health", tags=["Health"])
 @health_router.get("/health")
 async def fetch_profile(status):
     return {
-        "status": status
+        "status": "ok"
     }

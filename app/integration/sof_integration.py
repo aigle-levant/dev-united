@@ -9,6 +9,16 @@ from schemas.profiles import (
     StackOverflowAccount,
 )
 
+def fetch_profile_by_id(user_id: int) -> StackOverflowProfile:
+    data = get_json(
+        f"{SOF}/users/{user_id}",
+        params=SOF_PARAMS,
+    )["items"]
+
+    if not data:
+        return None
+
+    return fetch_profile(data[0])
 
 def search_users(name: str) -> list[dict]:
     return get_json(
@@ -87,14 +97,12 @@ def fetch_answers(user_id: int) -> list[Answer]:
     ]
 
 
-def fetch_stackoverflow(name: str) -> StackOverflowAccount | None:
-    users = search_users(name)
+def fetch_stackoverflow(user_id: int) -> StackOverflowAccount | None:
 
-    if not users:
+    profile = fetch_profile_by_id(user_id)
+
+    if not profile:
         return None
-    user = users[0]
-
-    profile = fetch_profile(user)
 
     return StackOverflowAccount(
         profile=profile,

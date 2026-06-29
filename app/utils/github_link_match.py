@@ -1,25 +1,24 @@
+from schemas.normalize import NormalizedAccount
 from utils.normalized_text import normalize_text
 
-def github_link_match(left, right):
-    if not left.website:
-        return False
 
-    if not right.github_username:
-        return False
+def github_link_match(
+    left: NormalizedAccount,
+    right: NormalizedAccount,
+) -> bool:
 
-    return (
-        f"github.com/{normalize_text(right.github_username)}"
-        in normalize_text(left.website)
-    )
+    if left.website and right.github_username:
+        if (
+            f"github.com/{normalize_text(right.github_username)}"
+            in normalize_text(left.website)
+        ):
+            return True
 
-def github_link_match_reversed(left, right):
-    if not left.github_username:
-        return False
+    if right.website and left.github_username:
+        if (
+            f"github.com/{normalize_text(left.github_username)}"
+            in normalize_text(right.website)
+        ):
+            return True
 
-    if not right.website:
-        return False
-
-    return (
-        f"github.com/{normalize_text(right.website)}"
-        in normalize_text(left.github_username)
-    )
+    return False

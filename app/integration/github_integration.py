@@ -3,6 +3,17 @@ from integration.base import GH_HEADERS, GH
 from utils.http import get_json
 from schemas.profiles import GitHubAccount, GitHubProfile, Repository, GitHubEvent
 
+def search_users(name: str) -> list[dict]:
+    data = get_json(
+        f"{GH}/search/users",
+        params={
+            "q": name,
+            "per_page": 5,
+        },
+        headers=GH_HEADERS,
+    )
+    return data["items"]
+
 def fetch_profile(username: str) -> GitHubProfile:
     data = get_json(
         f"{GH}/users/{username}",
