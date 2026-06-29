@@ -15,11 +15,8 @@ profile_router = APIRouter(prefix="/profiles", tags=["Profiles"])
 
 @profile_router.post("/resolve")
 async def resolve_profile_route(req: ResolveRequest):
-    accounts = await resolve_profile(req)
-
-    return {
-        "normalized": accounts
-    }
+    res = await resolve_profile(req)
+    return res
 
 
 @profile_router.get("/{profile_id}")

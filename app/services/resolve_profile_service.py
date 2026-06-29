@@ -10,24 +10,40 @@ from services.normalize_integrations import (
     normalize_hn,
 )
 
+from services.entity_resolution import resolve_entities
+
+
 async def resolve_profile_service(req):
     github = fetch_github(req.github) if req.github else None
-    stackoverflow = fetch_stackoverflow(req.name)
-    devto = fetch_devto(req.devto) if req.devto else None
-    hackernews = fetch_hn(req.hackernews) if req.hackernews else None
 
-    accounts = []
+    stackoverflow = (
+        fetch_stackoverflow(req.stackoverflow)
+        if req.stackoverflow
+        else fetch_stackoverflow(req.name)
+    )
+
+    devto = fetch_devto(req.devto) if req.devto else None
+
+    hackernews = (
+        fetch_hn(req.hackernews)
+        if req.hackernews
+        else None
+    )
+
+    normalized_accounts = []
 
     if github:
-        accounts.append(normalize_gh(github))
+        normalized_accounts.append(normalize_gh(github))
 
     if stackoverflow:
-        accounts.append(normalize_stackoverflow(stackoverflow))
+        normalized_accounts.append(normalize_stackoverflow(stackoverflow))
 
     if devto:
-        accounts.append(normalize_devto(devto))
+        normalized_accounts.append(normalize_devto(devto))
 
     if hackernews:
-        accounts.append(normalize_hn(hackernews))
+        normalized_accounts.append(normalize_hn(hackernews))
 
-    return accounts
+    resolved = resolve_entities(normalized_accounts)
+
+    return resolved
