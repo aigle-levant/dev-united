@@ -151,3 +151,10 @@ Given that all the 4 platforms have completely different responses, the challeng
 ![alt text](image-1.png)
 
 So the response is gigantic. Covers ALL the activity this guy's done.
+
+## AI usage
+
+AI was used to:
+
+- Decipher the long error logs left by FastAPI [often involving multiple files for no reason]
+- Generate tests for seeing if the structure's correct.

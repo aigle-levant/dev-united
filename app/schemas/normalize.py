@@ -1,3 +1,7 @@
+"""
+what does this do: schema for normalization of the 4 different sources of info
+"""
+# imports
 from pydantic import BaseModel
 
 class NormalizedAccount(BaseModel):

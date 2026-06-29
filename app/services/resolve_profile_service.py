@@ -3,18 +3,31 @@ from integration.github_integration import fetch_github
 from integration.hn_integration import fetch_hn
 from integration.sof_integration import fetch_stackoverflow
 
+from services.normalize_integrations import (
+    normalize_gh,
+    normalize_devto,
+    normalize_stackoverflow,
+    normalize_hn,
+)
+
 async def resolve_profile_service(req):
     github = fetch_github(req.github) if req.github else None
-
     stackoverflow = fetch_stackoverflow(req.name)
-
     devto = fetch_devto(req.devto) if req.devto else None
-
     hackernews = fetch_hn(req.hackernews) if req.hackernews else None
 
-    return {
-        "github": github,
-        "stackoverflow": stackoverflow,
-        "devto": devto,
-        "hackernews": hackernews,
-    }
+    accounts = []
+
+    if github:
+        accounts.append(normalize_gh(github))
+
+    if stackoverflow:
+        accounts.append(normalize_stackoverflow(stackoverflow))
+
+    if devto:
+        accounts.append(normalize_devto(devto))
+
+    if hackernews:
+        accounts.append(normalize_hn(hackernews))
+
+    return accounts
