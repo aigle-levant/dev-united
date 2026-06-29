@@ -10,8 +10,9 @@ class NormalizedAccount(BaseModel):
     username: str | None
     name: str | None
     bio: str | None
-    location: str | None
+    location: str |None
     website: str | None
-    github_username: str | None
-    twitter_username: str | None
+    github: str | None
+    twitter: str | None
+    email: str | None
     reputation: int | None
