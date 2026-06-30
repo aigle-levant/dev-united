@@ -3,7 +3,7 @@ from typing import Optional
 from schemas.normalize import NormalizedAccount
 
 class ResolveRequest(BaseModel):
-    name: str
+    name: Optional[str] = None
     github: Optional[str] = None
     stackoverflow: Optional[str] = None
     devto: Optional[str] = None

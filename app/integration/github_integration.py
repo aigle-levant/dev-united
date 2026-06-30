@@ -7,7 +7,7 @@ def search_users(name: str) -> list[dict]:
     data = get_json(
         f"{GH}/search/users",
         params={
-            "q": name,
+            "q": f'{name} in:fullname',
             "per_page": 5,
         },
         headers=GH_HEADERS,

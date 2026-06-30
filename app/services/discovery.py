@@ -12,9 +12,12 @@ from integration.sof_integration import (
 from utils.similarity_matcher import similarity
 
 
+MAX_CANDIDATES = 5
+
 GITHUB_THRESHOLD = 0.90
 STACKOVERFLOW_THRESHOLD = 0.90
-MAX_CANDIDATES = 5
+
+AMBIGUITY_MARGIN = 0.05
 
 
 def discover_github(
@@ -22,19 +25,21 @@ def discover_github(
     github_hint: str | None = None,
 ) -> str | None:
     """
-    Discover GitHub username.
+    Returns the most likely GitHub username.
+
+    Discovery only.
+    Identity resolution happens later.
     """
 
     if github_hint:
         return github_hint
 
     users = github_search(name)
-
+    print(users)
     if not users:
         return None
 
-    best_username = None
-    best_score = 0.0
+    candidates = []
 
     for user in users[:MAX_CANDIDATES]:
 
@@ -43,16 +48,47 @@ def discover_github(
         except Exception:
             continue
 
-        score = similarity(profile.name, name)
+        sim = similarity(profile.name, name)
+        print(
+    profile.username,
+    profile.name,
+    sim,
+)
 
-        if score > best_score:
-            best_score = score
-            best_username = profile.username
+        candidates.append(
+            (
+                sim,
+                profile,
+            )
+        )
 
-    if best_score >= GITHUB_THRESHOLD:
-        return best_username
+    if not candidates:
+        return None
 
-    return None
+    candidates.sort(
+        key=lambda x: x[0],
+        reverse=True,
+    )
+
+    best_similarity, best_profile = candidates[0]
+
+    if best_similarity < GITHUB_THRESHOLD:
+        return None
+
+    if len(candidates) > 1:
+
+        second_similarity = candidates[1][0]
+
+        if (
+            abs(
+                best_similarity
+                - second_similarity
+            )
+            < AMBIGUITY_MARGIN
+        ):
+            return None
+
+    return best_profile.username
 
 
 def discover_stackoverflow(
@@ -60,38 +96,61 @@ def discover_stackoverflow(
     stackoverflow_hint: str | None = None,
 ) -> int | None:
     """
-    Discover StackOverflow user id.
+    Returns the most likely StackOverflow user id.
     """
 
     if stackoverflow_hint:
+
         try:
             return int(stackoverflow_hint)
         except ValueError:
-            pass
+            return None
 
     users = stackoverflow_search(name)
 
     if not users:
         return None
 
-    best_id = None
-    best_score = 0.0
+    candidates = []
 
     for user in users[:MAX_CANDIDATES]:
 
-        score = similarity(
+        sim = similarity(
             user.get("display_name"),
             name,
         )
 
-        if score > best_score:
-            best_score = score
-            best_id = user["user_id"]
+        candidates.append(
+            (
+                sim,
+                user,
+            )
+        )
 
-    if best_score >= STACKOVERFLOW_THRESHOLD:
-        return best_id
+    candidates.sort(
+        key=lambda x: x[0],
+        reverse=True,
+    )
 
-    return None
+    best_similarity, best_user = candidates[0]
+
+    if best_similarity < STACKOVERFLOW_THRESHOLD:
+        return None
+
+    if len(candidates) > 1:
+
+        second_similarity = candidates[1][0]
+
+        if (
+            abs(
+                best_similarity
+                - second_similarity
+            )
+            < AMBIGUITY_MARGIN
+        ):
+            return None
+
+    return best_user["user_id"]
 
 
 def discover_devto(
@@ -99,11 +158,10 @@ def discover_devto(
     devto_hint: str | None = None,
 ) -> str | None:
     """
-    Discover Dev.to username.
+    Strategy
 
-    Strategy:
-    1. User supplied username.
-    2. Extract from GitHub blog URL if it points to dev.to.
+    1. Explicit username
+    2. GitHub blog links to dev.to
     """
 
     if devto_hint:
@@ -133,10 +191,9 @@ def discover_hackernews(
     hackernews_hint: str | None = None,
 ) -> str | None:
     """
-    Hacker News does not provide an official API to
-    search users by real name.
+    Hacker News has no reliable user search.
 
-    Therefore we only use a supplied username.
+    Therefore only an explicit username is accepted.
     """
 
     if hackernews_hint:

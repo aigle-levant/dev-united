@@ -10,12 +10,18 @@ route features:
 from fastapi import APIRouter
 from schemas.routes import ResolveRequest
 from services.resolve_profile_service import resolve_profile_service as resolve_profile
+import time
+from services.check_health import log_resolution
 
 profile_router = APIRouter(prefix="/profiles", tags=["Profiles"])
 
 @profile_router.post("/resolve")
 async def resolve_profile_route(req: ResolveRequest):
+    start_time = time.time()
     res = await resolve_profile(req)
+    duration_ms = (time.time() - start_time) * 1000
+    log_resolution(duration_ms)
+    
     return res
 
 

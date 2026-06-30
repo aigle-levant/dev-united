@@ -69,21 +69,20 @@ async def resolve_profile_service(req):
     # --------------------------
 
     accounts = []
+    accounts.append(github)
+    accounts.append(stackoverflow)
+    accounts.append(devto)
+    accounts.append(hackernews)
 
-    if github:
-        accounts.append(normalize_gh(github))
+    # if github:
+    #     accounts.append(normalize_gh(github))
 
-    if stackoverflow:
-        accounts.append(normalize_stackoverflow(stackoverflow))
+    # if stackoverflow:
+    #     accounts.append(normalize_stackoverflow(stackoverflow))
 
-    if devto:
-        accounts.append(normalize_devto(devto))
+    # if devto:
+    #     accounts.append(normalize_devto(devto))
 
-    if hackernews:
-        accounts.append(normalize_hn(hackernews))
-
-    # --------------------------
-    # ENTITY RESOLUTION
-    # --------------------------
-
+    # if hackernews:
+    #     accounts.append(normalize_hn(hackernews))
     return accounts
