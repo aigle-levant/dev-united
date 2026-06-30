@@ -35,7 +35,6 @@ def discover_github(
         return github_hint
 
     users = github_search(name)
-    print(users)
     if not users:
         return None
 
@@ -49,11 +48,6 @@ def discover_github(
             continue
 
         sim = similarity(profile.name, name)
-        print(
-    profile.username,
-    profile.name,
-    sim,
-)
 
         candidates.append(
             (
