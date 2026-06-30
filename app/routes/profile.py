@@ -7,9 +7,10 @@ route features:
 """
 
 # imports
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from schemas.routes import ResolveRequest
 from services.resolve_profile_service import resolve_profile_service as resolve_profile
+from services.get_profile import get_profile
 import time
 from services.check_health import log_resolution
 
@@ -18,15 +19,24 @@ profile_router = APIRouter(prefix="/profiles", tags=["Profiles"])
 @profile_router.post("/resolve")
 async def resolve_profile_route(req: ResolveRequest):
     start_time = time.time()
-    res = await resolve_profile(req)
+
+    result = await resolve_profile(req)
+
     duration_ms = (time.time() - start_time) * 1000
     log_resolution(duration_ms)
-    
-    return res
+
+    return result
 
 
 @profile_router.get("/{profile_id}")
 async def fetch_profile(profile_id: str):
-    return {
-        "profile_id": 100
-    }
+
+    profile = get_profile(profile_id)
+
+    if profile is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Profile not found",
+        )
+
+    return profile

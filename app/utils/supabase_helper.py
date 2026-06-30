@@ -10,7 +10,7 @@ def save_raw_profile(
     if hasattr(payload, "model_dump"):
         payload = payload.model_dump(mode="json")
 
-    return (
+    result = (
         supabase.table("raw_profiles")
         .upsert(
             {
@@ -23,3 +23,5 @@ def save_raw_profile(
         )
         .execute()
     )
+
+    return result.data[0]

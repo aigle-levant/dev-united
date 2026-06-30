@@ -10,6 +10,8 @@ from integration.sof_integration import fetch_stackoverflow
 from integration.devto_integration import fetch_devto
 from integration.hn_integration import fetch_hn
 
+from services.entity_resolution import resolve_entities
+
 from utils.supabase_helper import save_raw_profile
 
 from services.normalize_integrations import (
@@ -22,10 +24,6 @@ from services.normalize_integrations import (
 
 async def resolve_profile_service(req):
 
-    # ------------------------------------
-    # DISCOVERY
-    # ------------------------------------
-
     github_username = discover_github(
         req.name,
         req.github,
@@ -36,37 +34,17 @@ async def resolve_profile_service(req):
         req.stackoverflow,
     )
 
-    # ------------------------------------
-    # FETCH
-    # ------------------------------------
-
     github = (
         fetch_github(github_username)
         if github_username
         else None
     )
 
-    if github:
-        save_raw_profile(
-            source="github",
-            external_id=str(github.profile.id),
-            lookup_key=github.profile.username,
-            payload=github,
-        )
-
     stackoverflow = (
         fetch_stackoverflow(stackoverflow_id)
         if stackoverflow_id
         else None
     )
-
-    if stackoverflow:
-        save_raw_profile(
-            source="stackoverflow",
-            external_id=str(stackoverflow.profile.user_id),
-            lookup_key=str(stackoverflow.profile.user_id),
-            payload=stackoverflow,
-        )
 
     devto_username = discover_devto(
         github.profile.blog if github else None,
@@ -79,14 +57,6 @@ async def resolve_profile_service(req):
         else None
     )
 
-    if devto:
-        save_raw_profile(
-            source="devto",
-            external_id=devto.profile.username,
-            lookup_key=devto.profile.username,
-            payload=devto,
-        )
-
     hackernews_username = discover_hackernews(
         req.name,
         req.hackernews,
@@ -98,31 +68,66 @@ async def resolve_profile_service(req):
         else None
     )
 
+
+    github_raw = None
+    stackoverflow_raw = None
+    devto_raw = None
+    hackernews_raw = None
+
+    if github:
+        github_raw = save_raw_profile(
+            source="github",
+            external_id=str(github.profile.id),
+            lookup_key=github.profile.username,
+            payload=github,
+        )
+
+    if stackoverflow:
+        stackoverflow_raw = save_raw_profile(
+            source="stackoverflow",
+            external_id=str(stackoverflow.profile.user_id),
+            lookup_key=str(stackoverflow.profile.user_id),
+            payload=stackoverflow,
+        )
+
+    if devto:
+        devto_raw = save_raw_profile(
+            source="devto",
+            external_id=devto.profile.username,
+            lookup_key=devto.profile.username,
+            payload=devto,
+        )
+
     if hackernews:
-        save_raw_profile(
+        hackernews_raw = save_raw_profile(
             source="hackernews",
             external_id=hackernews.profile.username,
             lookup_key=hackernews.profile.username,
             payload=hackernews,
         )
 
-    # ------------------------------------
-    # NORMALIZATION
-    # ------------------------------------
 
     accounts = []
+    raw_profiles = []
 
     if github:
         accounts.append(normalize_gh(github))
+        raw_profiles.append(github_raw)
 
     if stackoverflow:
         accounts.append(normalize_stackoverflow(stackoverflow))
+        raw_profiles.append(stackoverflow_raw)
 
     if devto:
         accounts.append(normalize_devto(devto))
+        raw_profiles.append(devto_raw)
 
     if hackernews:
         accounts.append(normalize_hn(hackernews))
+        raw_profiles.append(hackernews_raw)
 
 
-    return accounts
+    return resolve_entities(
+        accounts=accounts,
+        raw_profiles=raw_profiles,
+    )
