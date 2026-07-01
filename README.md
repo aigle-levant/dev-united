@@ -1,160 +1,382 @@
-# dev-united
-An unified portfolio for developers
+# Dev United
 
-## Avoiding re-writing
+A FastAPI-based service that unifies developer profiles across multiple public platforms into a single canonical profile.
 
-In programming, we have a principle:
+The system discovers developer accounts, ingests public profile data, resolves identities across platforms using deterministic confidence scoring, stores both raw and canonical representations in Supabase, enriches the unified profile using Gemini 2.5 Flash, and exposes everything through a REST API.
 
-``DRY: DON'T REPEAT YOURSELF``
+ 
 
-Which means, modules are the way to go. And python is the best way for this.
+# Features
 
-Example, instead of duplicating the same HTTP request logic in every API integration, I extracted the common functionality into a shared helper.
+- GitHub integration
+- Stack Overflow integration
+- dev.to integration
+- Hacker News integration
+- Deterministic entity resolution
+- Canonical profile generation
+- Gemini-powered profile summaries
+- Supabase persistence
+- Health & observability endpoint
+- Render deployment
 
-Previously, each integration contained repetitive code like:
+ 
 
-```py
+# Architecture
+
+```
+POST /profiles/resolve
+        │
+        ▼
+Account Discovery
+        │
+        ▼
+Fetch External APIs
+        │
+        ▼
+Store Raw Profiles
+        │
+        ▼
+Normalize Profiles
+        │
+        ▼
+Entity Resolution
+        │
+        ▼
+Create Canonical Profile
+        │
+        ▼
+Gemini Summary
+        │
+        ▼
+Update Canonical Profile
+        │
+        ▼
+Return profile_id
+```
+
+The API intentionally separates ingestion from canonical data. Raw API responses are preserved so the canonical profile can always be regenerated without re-fetching external services.
+
+ 
+
+# Data Sources
+
+| Platform | Information Retrieved |
+|   --|       --|
+| GitHub | Profile, repositories, languages, recent activity |
+| Stack Overflow | Profile, reputation |
+| dev.to | Profile, articles |
+| Hacker News | Profile, comments & submissions |
+
+ 
+
+# Project Structure
+
+```
+app/
+│
+├── integration/
+│     GitHub
+│     Stack Overflow
+│     Dev.to
+│     HackerNews
+│
+├── routes/
+│
+├── services/
+│     Discovery
+│     Entity Resolution
+│     AI Layer
+│
+├── utils/
+│
+├── schemas/
+│
+└── db/
+```
+
+Each integration is isolated from the others, making it easy to introduce new developer platforms without affecting the resolution pipeline.
+
+ 
+
+# Avoiding Repetition
+
+A common helper (`get_json`) handles all outbound HTTP requests.
+
+Instead of repeating
+
+```python
 response = httpx.get(...)
 response.raise_for_status()
 return response.json()
 ```
 
-To eliminate this duplication, I created a reusable helper:
+every integration simply calls
 
-```py
-def get_json(
-    url: str,
-    *,
-    params: dict | None = None,
-    headers: dict | None = None,
-    timeout: int = 10,
-):
-    response = httpx.get(
-        url,
-        params=params,
-        headers=headers,
-        timeout=timeout,
-    )
-
-    response.raise_for_status()
-
-    return response.json()
+```python
+get_json(
+    url,
+    headers=headers,
+    params=params,
+)
 ```
 
-```PY
-def fetch_profile(username: str):
-    return get_json(
-        f"{HN}/users/{username}"
-    )
+This keeps the integrations small while centralizing request handling and health logging.
+
+ 
+
+# Normalization
+
+Each external API exposes completely different schemas.
+
+For example:
+
+GitHub
+
+- login
+- followers
+- company
+- blog
+
+Stack Overflow
+
+- display_name
+- reputation
+- website_url
+
+dev.to
+
+- username
+- summary
+- github_username
+
+Hacker News
+
+- username
+- karma
+
+These are transformed into one common internal model:
+
+```python
+NormalizedAccount
 ```
 
-Now all I need to do is to simply call `get_json()` and pass arguments.
+which contains
 
-## Example of responses from various platforms
+- source
+- username
+- name
+- bio
+- location
+- website
+- github_username
+- twitter_username
+- email
+- reputation
 
-Given that all the 4 platforms have completely different responses, the challenge is **normalization** without losing data.
+This allows downstream services to perform matching without depending on provider-specific fields.
 
-### Github
+ 
+
+# Entity Resolution
+
+Entity resolution is deterministic.
+
+Every normalized account is compared against the chosen canonical account.
+
+Signals currently include:
+
+| Signal | Weight |
+|   |  -:|
+| GitHub username | 60 |
+| Email | 50 |
+| GitHub backlink | 40 |
+| Twitter username | 30 |
+| Website | 20 |
+| Name similarity | 20 |
+| Location similarity | 10 |
+
+Profiles with confidence scores above the configured threshold are linked to the canonical profile.
+
+Ambiguous matches are intentionally rejected instead of forcing incorrect merges.
+
+ 
+
+# Database Design
+
+The schema separates ingestion from canonical entities.
+
+## raw_profiles
+
+Stores complete API responses from every provider.
+
+Purpose:
+
+- preserve source data
+- avoid repeated API calls
+- allow rebuilding canonical profiles
+
+ 
+
+## canonical_profiles
+
+Stores the unified developer profile.
+
+Fields include
+
+- name
+- bio
+- website
+- location
+- llm_summary
+
+ 
+
+## profile_links
+
+Maps raw profiles to canonical profiles.
+
+Stores
+
+- confidence score
+- matching signals
+- match status
+
+ 
+
+## api_request_logs
+
+Tracks every external API request.
+
+Used by the health endpoint.
+
+ 
+
+## resolution_logs
+
+Tracks profile resolution latency.
+
+Used to compute average processing time.
+
+
+## llm_usage_logs
+
+Stores
+
+- provider
+- model
+- token usage
+- estimated cost
+
+
+## github_rate_limit
+
+Stores the latest GitHub rate limit information for observability.
+
+# AI Layer
+
+Gemini 2.5 Flash is used to generate a concise summary of the unified developer profile.
+
+The prompt includes information aggregated across multiple platforms.
+
+The generated summary is stored inside the canonical profile instead of being regenerated on every request.
+
+
+# API
+
+## POST /profiles/resolve
+
+Input
 
 ```json
 {
-  "login": "Swiddis",
-  "id": 31739405,
-  "node_id": "MDQ6VXNlcjMxNzM5NDA1",
-  "avatar_url": "https://avatars.githubusercontent.com/u/31739405?v=4",
-  "gravatar_id": "",
-  "url": "https://api.github.com/users/Swiddis",
-  "html_url": "https://github.com/Swiddis",
-  "followers_url": "https://api.github.com/users/Swiddis/followers",
-  "following_url": "https://api.github.com/users/Swiddis/following{/other_user}",
-  "gists_url": "https://api.github.com/users/Swiddis/gists{/gist_id}",
-  "starred_url": "https://api.github.com/users/Swiddis/starred{/owner}{/repo}",
-  "subscriptions_url": "https://api.github.com/users/Swiddis/subscriptions",
-  "organizations_url": "https://api.github.com/users/Swiddis/orgs",
-  "repos_url": "https://api.github.com/users/Swiddis/repos",
-  "events_url": "https://api.github.com/users/Swiddis/events{/privacy}",
-  "received_events_url": "https://api.github.com/users/Swiddis/received_events",
-  "type": "User",
-  "user_view_type": "public",
-  "site_admin": false,
-  "name": "Simeon Widdis",
-  "company": "@opensearch-project",
-  "blog": "https://swiddis.net/",
-  "location": null,
-  "email": null,
-  "hireable": null,
-  "bio": "Software engineer writing database frontends with @opensearch-project, @aws. Likes: shells, optimization, dev experience, and watching code compile.",
-  "twitter_username": null,
-  "public_repos": 90,
-  "public_gists": 19,
-  "followers": 23,
-  "following": 24,
-  "created_at": "2017-09-07T16:08:27Z",
-  "updated_at": "2026-05-25T23:08:52Z"
+    "name": "Ben Halpern"
 }
 ```
 
-### stackOverFlow
+Response
 
 ```json
 {
-  "items": [
-    {
-      "badge_counts": {
-        "bronze": 153,
-        "silver": 153,
-        "gold": 48
-      },
-      "account_id": 1,
-      "is_employee": false,
-      "last_modified_date": 1775405100,
-      "last_access_date": 1781033610,
-      "reputation_change_year": 40,
-      "reputation_change_quarter": 10,
-      "reputation_change_month": 20,
-      "reputation_change_week": 20,
-      "reputation_change_day": 0,
-      "reputation": 64179,
-      "creation_date": 1217514151,
-      "user_type": "registered",
-      "user_id": 1,
-      "accept_rate": 100,
-      "location": "Alameda, CA",
-      "website_url": "https://blog.codinghorror.com/",
-      "link": "https://stackoverflow.com/users/1/jeff-atwood",
-      "profile_image": "https://www.gravatar.com/avatar/51d623f33f8b83095db84ff35e15dbe8?s=256&d=identicon&r=PG",
-      "display_name": "Jeff Atwood"
-    }
-  ],
-  "has_more": false,
-  "quota_max": 10000,
-  "quota_remaining": 9979
+    "profile_id": "..."
 }
 ```
 
-### HackerNews
 
-```json
-{"about":"Bug fixer.","karma":157316,"username":"pg"}
+## GET /profiles/{id}
+
+Returns
+
+- canonical profile
+- Gemini summary
+- contributing source profiles
+- confidence scores
+
+
+## GET /health
+
+Provides production-style observability including
+
+- GitHub rate limits
+- external API requests
+- LLM usage
+- average resolution time
+- number of profiles resolved
+
+
+# Running Locally
+
+```
+pip install -r requirements.txt
 ```
 
-### Dev.to
+Create
 
-```json
-{"type_of":"user","id":1,"username":"ben","name":"Ben Halpern","twitter_username":"bendhalpern","github_username":"benhalpern","summary":"A Canadian software developer who thinks he’s funny.","location":"NY","website_url":"http://benhalpern.com","joined_at":"Dec 27, 2015","profile_image":"https://media2.dev.to/dynamic/image/width=320,height=320,fit=cover,gravity=auto,format=auto/https%3A%2F%2Fdev-to-uploads.s3.us-east-2.amazonaws.com%2Fuploads%2Fuser%2Fprofile_image%2F1%2Fbabb96d0-9cd2-49bc-a412-2dc4caf94c2a.png"}
+```
+.env
 ```
 
-## Swagger - Initial check
+```
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
 
-![alt text](image.png)
+GITHUB_TOKEN=
+SOF_API_KEY=
 
-![alt text](image-1.png)
+GEMINI_API_KEY=
+```
 
-So the response is gigantic. Covers ALL the activity this guy's done.
+Run
 
-## AI usage
+```
+uvicorn app.main:app --reload
+```
 
-AI was used to:
 
-- Decipher the long error logs left by FastAPI [often involving multiple files for no reason]
-- Generate tests for seeing if the structure's correct.
+# Deployment
+
+The application is deployed on Render.
+
+
+# Trade-offs
+
+To keep the project focused, I chose deterministic weighted matching instead of an embedding-based or fully LLM-assisted identity resolution system.
+
+This approach is:
+
+- explainable
+- fast
+- inexpensive
+- easy to tune
+
+One limitation is that very ambiguous profiles may not be merged automatically.
+
+# AI Usage
+
+AI tools (primarily ChatGPT) were used for:
+
+- debugging FastAPI stack traces
+- discussing architecture trade-offs
+- generating boilerplate
+- reviewing code structure
+
+Final implementation, integration decisions, schema design, entity resolution strategy, testing, and debugging were completed manually.
