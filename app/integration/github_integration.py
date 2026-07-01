@@ -1,23 +1,45 @@
 from collections import Counter
+
 from integration.base import GH_HEADERS, GH
 from utils.http import get_json
-from schemas.profiles import GitHubAccount, GitHubProfile, Repository, GitHubEvent
 
-def search_users(name: str) -> list[dict]:
+from schemas.profiles import (
+    GitHubAccount,
+    GitHubProfile,
+    Repository,
+    GitHubEvent,
+)
+
+def github_request(endpoint: str, params=None):
+    """
+    Wrapper around get_json that updates health metrics.
+    """
+
+
     data = get_json(
-        f"{GH}/search/users",
-        params={
-            "q": f'{name} in:fullname',
-            "per_page": 5,
-        },
+        f"{GH}{endpoint}",
+        params=params,
         headers=GH_HEADERS,
     )
+
+    return data
+
+
+def search_users(name: str) -> list[dict]:
+    data = github_request(
+        "/search/users",
+        params={
+            "q": f"{name} in:fullname",
+            "per_page": 5,
+        },
+    )
+
     return data["items"]
 
+
 def fetch_profile(username: str) -> GitHubProfile:
-    data = get_json(
-        f"{GH}/users/{username}",
-        headers=GH_HEADERS,
+    data = github_request(
+        f"/users/{username}",
     )
 
     return GitHubProfile(
@@ -41,9 +63,8 @@ def fetch_profile(username: str) -> GitHubProfile:
 
 
 def fetch_repositories(username: str) -> list[Repository]:
-    repos = get_json(
-        f"{GH}/users/{username}/repos",
-        headers=GH_HEADERS,
+    repos = github_request(
+        f"/users/{username}/repos",
     )
 
     return [
@@ -65,9 +86,9 @@ def fetch_events(
     username: str,
     limit: int = 10,
 ) -> list[GitHubEvent]:
-    events = get_json(
-        f"{GH}/users/{username}/events/public",
-        headers=GH_HEADERS,
+
+    events = github_request(
+        f"/users/{username}/events/public",
     )
 
     activity = []
@@ -107,9 +128,7 @@ def extract_languages(
 
 def fetch_github(username: str) -> GitHubAccount:
     profile = fetch_profile(username)
-
     repositories = fetch_repositories(username)
-
     events = fetch_events(username)
 
     return GitHubAccount(

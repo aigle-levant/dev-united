@@ -23,7 +23,12 @@ async def resolve_profile_route(req: ResolveRequest):
     result = await resolve_profile(req)
 
     duration_ms = (time.time() - start_time) * 1000
-    log_resolution(duration_ms)
+    duration_ms = (time.time() - start_time) * 1000
+
+    log_resolution(
+    profile_id=result["profile_id"],
+    duration_ms=duration_ms,
+)
 
     return result
 

@@ -1,70 +1,114 @@
 import time
-from typing import Dict, Any
-
-# In-memory metrics dictionaries
-api_calls: Dict[str, int] = {
-    "github": 0,
-    "stackoverflow": 0,
-    "devto": 0,
-    "hackernews": 0
-}
-
-llm_metrics = {
-    "total_tokens": 0,
-    "estimated_cost_usd": 0.0
-}
-
-resolution_metrics = {
-    "total_resolved": 0,
-    "total_processing_time_ms": 0.0
-}
-
-github_rate_limit = {
-    "remaining": "Unknown",
-    "total": "Unknown",
-    "reset_time": "Unknown"
-}
+from collections import Counter
+from datetime import datetime, UTC
+from db.supabase import supabase
 
 
-def log_api_call(source: str):
-    global api_calls
-    if source in api_calls:
-        api_calls[source] += 1
+def log_resolution(
+    profile_id: str,
+    duration_ms: float,
+):
+    (
+        supabase.table("resolution_logs")
+        .insert(
+            {
+                "profile_id": profile_id,
+                "duration_ms": duration_ms,
+            }
+        )
+        .execute()
+    )
 
 
-def update_github_headers(remaining: str, total: str, reset: str):
-    global github_rate_limit
-    github_rate_limit["remaining"] = remaining
-    github_rate_limit["total"] = total
-    github_rate_limit["reset_time"] = reset
+def get_health_report():
 
+    # --------------------------
+    # API request logs
+    # --------------------------
 
-def log_llm_usage(tokens: int):
-    global llm_metrics
-    llm_metrics["total_tokens"] += tokens
+    api_rows = (
+        supabase.table("api_request_logs")
+        .select("source")
+        .execute()
+    )
 
+    api_calls = Counter()
 
-def log_resolution(duration_ms: float):
-    global resolution_metrics
-    resolution_metrics["total_resolved"] += 1
-    resolution_metrics["total_processing_time_ms"] += duration_ms
+    for row in api_rows.data:
+        api_calls[row["source"]] += 1
 
+    # --------------------------
+    # Resolution logs
+    # --------------------------
 
-def get_health_report() -> Dict[str, Any]:
-    global api_calls, llm_metrics, resolution_metrics, github_rate_limit
-    
-    total = resolution_metrics["total_resolved"]
-    total_time = resolution_metrics["total_processing_time_ms"]
-    avg_time = (total_time / total) if total > 0 else 0.0
-    
+    resolution_rows = (
+        supabase.table("resolution_logs")
+        .select("duration_ms")
+        .execute()
+    )
+
+    total_profiles = len(resolution_rows.data)
+
+    avg_resolution = (
+        sum(row["duration_ms"] for row in resolution_rows.data)
+        / total_profiles
+        if total_profiles
+        else 0
+    )
+
+    # --------------------------
+    # LLM usage
+    # --------------------------
+
+    llm_rows = (
+        supabase.table("llm_usage_logs")
+        .select("total_tokens, estimated_cost")
+        .execute()
+    )
+
+    total_tokens = sum(
+        row["total_tokens"]
+        for row in llm_rows.data
+    )
+
+    estimated_cost = sum(
+        row["estimated_cost"]
+        for row in llm_rows.data
+    )
+    rate = (
+    supabase.table("github_rate_limit")
+    .select("*")
+    .eq("id", 1)
+    .single()
+    .execute()
+).data
+
+    reset = datetime.fromtimestamp(
+    rate["reset_time"],
+    UTC,
+).isoformat()
     return {
-        "status": "healthy",
-        "timestamp_epoch": int(time.time()),
-        "github_rate_limiting": github_rate_limit,
-        "external_api_calls_by_source": api_calls,
-        "llm_observability": llm_metrics,
-        "resolution_performance": {
-            "profiles_resolved_count": total,
-            "average_resolution_time_ms": round(avg_time, 2)
-        }
-    }
+    "status": "healthy",
+    "timestamp_epoch": int(time.time()),
+
+    "github_rate_limiting": {
+        "remaining": rate["remaining"],
+        "total": rate["total"],
+        "reset_time": datetime.fromtimestamp(
+            rate["reset_time"],
+            UTC,
+        ).isoformat(),
+    },
+
+    "external_api_calls_by_source": dict(api_calls),
+
+    "llm_observability": {
+        "total_tokens": total_tokens,
+        "estimated_cost_usd": estimated_cost,
+    },
+
+    "resolution_performance": {
+        "profiles_resolved_count": total_profiles,
+        "average_resolution_time_ms": round(avg_resolution, 2),
+    },
+}
