@@ -21,6 +21,11 @@ from services.normalize_integrations import (
     normalize_hn,
 )
 
+from services.ai import generate_profile_summary
+from utils.ai import (
+    save_llm_summary,
+    save_llm_usage,
+)
 
 async def resolve_profile_service(req):
 
@@ -126,8 +131,28 @@ async def resolve_profile_service(req):
         accounts.append(normalize_hn(hackernews))
         raw_profiles.append(hackernews_raw)
 
-
-    return resolve_entities(
+    resolved = resolve_entities(
         accounts=accounts,
         raw_profiles=raw_profiles,
     )
+
+    summary, tokens = generate_profile_summary(
+        resolved["canonical"],
+        accounts,
+    )
+
+    save_llm_summary(
+        resolved["profile_id"],
+        summary,
+    )
+
+    save_llm_usage(
+        provider="Google",
+        model="gemini-2.5-flash",
+        tokens=tokens,
+    )
+
+    return {
+    **resolved,
+    "llm_summary": summary,
+}

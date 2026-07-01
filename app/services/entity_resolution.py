@@ -96,5 +96,7 @@ def resolve_entities(
         )
 
     return {
-        "profile_id": canonical_id,
-    }
+    "profile_id": canonical_id,
+    "canonical": canonical,
+    "sources": matches,
+}
